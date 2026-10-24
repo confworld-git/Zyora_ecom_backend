@@ -787,68 +787,168 @@ export const updateProduct = async (req, res) => {
       const originalImages = product.images.map((image) =>
         typeof image.toObject === "function" ? image.toObject() : image,
       );
-      const retainedUrls = new Set();
-      const retainedImages = [];
-      for (const image of existingImages) {
-        const original = originalImages.find(
-          (candidate) => candidate.url === image.url,
-        );
-        if (!original || retainedUrls.has(original.url)) {
-          return res.status(400).json({
-            success: false,
-            message: "An existing product image is invalid",
-          });
-        }
-        retainedUrls.add(original.url);
-        retainedImages.push({
-          id: original.id,
-          url: original.url,
-          color:
-            typeof image.color === "string" ? image.color.trim() || null : null,
-          alt:
-            typeof image.alt === "string" && image.alt.trim()
-              ? image.alt.trim()
-              : original.alt,
-        });
-      }
+      const usesPositionedImages =
+        existingImages.some((image) => Number.isInteger(image.position)) ||
+        imageMetadata.some((image) => Number.isInteger(image?.position));
+      const totalImages = existingImages.length + imageFiles.length;
 
-      if (retainedImages.length + imageFiles.length > 4) {
+      if (totalImages > 4) {
         return res.status(400).json({
           success: false,
           message: "A product can have up to four images",
         });
       }
-      if (retainedImages.length + imageFiles.length === 0) {
+      if (totalImages === 0) {
         return res.status(400).json({
           success: false,
           message: "A product must have at least one image",
         });
       }
 
-      const uploadedImages = [];
-      for (let index = 0; index < imageFiles.length; index++) {
-        const file = imageFiles[index];
-        const metadata = imageMetadata[index] || {};
-        const result = await uploadToCloudinary(file.buffer);
-        uploadedImages.push({
-          id:
-            typeof metadata.id === "string" && metadata.id.trim()
-              ? metadata.id.trim()
-              : `img-${retainedImages.length + index + 1}`,
-          url: result.secure_url,
-          color:
-            typeof metadata.color === "string"
-              ? metadata.color.trim() || null
-              : null,
-          alt:
-            typeof metadata.alt === "string" && metadata.alt.trim()
-              ? metadata.alt.trim()
-              : `${(name || product.name).trim()} image ${
-                  retainedImages.length + index + 1
-                }`,
-        });
+      if (usesPositionedImages) {
+        const imagesByPosition = new Map();
+        const retainedUrls = new Set();
+        for (const image of existingImages) {
+          if (
+            !Number.isInteger(image.position) ||
+            image.position < 0 ||
+            image.position >= totalImages ||
+            imagesByPosition.has(image.position)
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid product image order",
+            });
+          }
+          const original = originalImages.find(
+            (candidate) => candidate.url === image.url,
+          );
+          if (!original || retainedUrls.has(original.url)) {
+            return res.status(400).json({
+              success: false,
+              message: "An existing product image is invalid",
+            });
+          }
+          retainedUrls.add(original.url);
+          imagesByPosition.set(image.position, {
+            id: original.id,
+            url: original.url,
+            color:
+              typeof image.color === "string"
+                ? image.color.trim() || null
+                : null,
+            alt:
+              typeof image.alt === "string" && image.alt.trim()
+                ? image.alt.trim()
+                : original.alt,
+          });
+        }
+
+        for (const metadata of imageMetadata) {
+          if (
+            !Number.isInteger(metadata?.position) ||
+            metadata.position < 0 ||
+            metadata.position >= totalImages ||
+            imagesByPosition.has(metadata.position)
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid product image order",
+            });
+          }
+          imagesByPosition.set(metadata.position, null);
+        }
+
+        if (
+          imagesByPosition.size !== totalImages ||
+          Array.from({ length: totalImages }, (_, position) =>
+            imagesByPosition.has(position),
+          ).some((exists) => !exists)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Every product image must have a valid position",
+          });
+        }
+
+        for (let index = 0; index < imageFiles.length; index++) {
+          const file = imageFiles[index];
+          const metadata = imageMetadata[index] || {};
+          const result = await uploadToCloudinary(file.buffer);
+          imagesByPosition.set(metadata.position, {
+            id:
+              typeof metadata.id === "string" && metadata.id.trim()
+                ? metadata.id.trim()
+                : `img-${metadata.position + 1}`,
+            url: result.secure_url,
+            color:
+              typeof metadata.color === "string"
+                ? metadata.color.trim() || null
+                : null,
+            alt:
+              typeof metadata.alt === "string" && metadata.alt.trim()
+                ? metadata.alt.trim()
+                : `${(name || product.name).trim()} image ${metadata.position + 1}`,
+          });
+        }
+
+        updates.images = Array.from(
+          { length: totalImages },
+          (_, position) => imagesByPosition.get(position),
+        );
+      } else {
+        const retainedUrls = new Set();
+        const retainedImages = [];
+        for (const image of existingImages) {
+          const original = originalImages.find(
+            (candidate) => candidate.url === image.url,
+          );
+          if (!original || retainedUrls.has(original.url)) {
+            return res.status(400).json({
+              success: false,
+              message: "An existing product image is invalid",
+            });
+          }
+          retainedUrls.add(original.url);
+          retainedImages.push({
+            id: original.id,
+            url: original.url,
+            color:
+              typeof image.color === "string"
+                ? image.color.trim() || null
+                : null,
+            alt:
+              typeof image.alt === "string" && image.alt.trim()
+                ? image.alt.trim()
+                : original.alt,
+          });
+        }
+
+        const uploadedImages = [];
+        for (let index = 0; index < imageFiles.length; index++) {
+          const file = imageFiles[index];
+          const metadata = imageMetadata[index] || {};
+          const result = await uploadToCloudinary(file.buffer);
+          uploadedImages.push({
+            id:
+              typeof metadata.id === "string" && metadata.id.trim()
+                ? metadata.id.trim()
+                : `img-${retainedImages.length + index + 1}`,
+            url: result.secure_url,
+            color:
+              typeof metadata.color === "string"
+                ? metadata.color.trim() || null
+                : null,
+            alt:
+              typeof metadata.alt === "string" && metadata.alt.trim()
+                ? metadata.alt.trim()
+                : `${(name || product.name).trim()} image ${
+                    retainedImages.length + index + 1
+                  }`,
+          });
+        }
+        updates.images = [...retainedImages, ...uploadedImages];
       }
-      updates.images = [...retainedImages, ...uploadedImages];
     }
 
     const updatedColors =
