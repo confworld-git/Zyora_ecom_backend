@@ -4,6 +4,7 @@ import Order from "../schemas/Order.js";
 import Customer from "../schemas/Customer.js";
 import Product from "../schemas/Product.js";
 import { getPricing } from "../utils/getPricing.js";
+import { calculateShippingFee } from "../utils/shippingPricing.js";
 import Coupon from "../schemas/Coupon.js";
 import { getCouponDiscount } from "../utils/couponHelper.js";
 import { redeemCoupon } from "./couponController.js";
@@ -320,12 +321,8 @@ export const createOrder = async (req, res) => {
 
   try {
     // Current fees, as set by the admin in the dashboard
-    const {
-      freeShippingLimit: FREE_SHIPPING_LIMIT,
-      shippingCharge: SHIPPING_CHARGE,
-      shippingChargeforCOD: SHIPPING_CHARGE_FOR_COD,
-      platformFee: PLATFORM_FEE,
-    } = await getPricing();
+    const pricing = await getPricing();
+    const { platformFee: PLATFORM_FEE } = pricing;
 
     const { shippingAddress, couponCode } = req.body;
 
@@ -427,9 +424,12 @@ export const createOrder = async (req, res) => {
     }
 
     const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    const shippingCharge =
-      paymentMethod === "cod" ? SHIPPING_CHARGE_FOR_COD : SHIPPING_CHARGE;
-    const shippingFee = subtotal >= FREE_SHIPPING_LIMIT ? 0 : shippingCharge;
+    const { region: shippingRegion, shippingFee } = calculateShippingFee({
+      address: shippingAddress,
+      paymentMethod,
+      subtotal,
+      pricing,
+    });
 
     let couponDiscount = 0;
     let appliedCode = null;
@@ -525,6 +525,7 @@ export const createOrder = async (req, res) => {
         pinCode: String(a.pinCode).trim(),
       },
       subtotal,
+      shippingRegion,
       shippingFee,
       platformFee: PLATFORM_FEE,
       couponCode: appliedCode,

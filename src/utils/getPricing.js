@@ -14,5 +14,23 @@ export const getPricing = async () => {
       saved?.shippingCharge ??
       DEFAULT_PRICING.shippingChargeforCOD,
     platformFee: saved?.platformFee ?? DEFAULT_PRICING.platformFee,
+    shippingChargeforChennai:
+      saved?.shippingChargeforChennai ??
+      DEFAULT_PRICING.shippingChargeforChennai,
+    shippingChargeforChennaiCOD:
+      saved?.shippingChargeforChennaiCOD ??
+      DEFAULT_PRICING.shippingChargeforChennaiCOD,
+    shippingChargeforTamilNadu:
+      saved?.shippingChargeforTamilNadu ??
+      DEFAULT_PRICING.shippingChargeforTamilNadu,
+    shippingChargeforTamilNaduCOD:
+      saved?.shippingChargeforTamilNaduCOD ??
+      DEFAULT_PRICING.shippingChargeforTamilNaduCOD,
+    shippingChargeforRestofIndia:
+      saved?.shippingChargeforRestofIndia ??
+      DEFAULT_PRICING.shippingChargeforRestofIndia,
+    shippingChargeforRestofIndiaCOD:
+      saved?.shippingChargeforRestofIndiaCOD ??
+      DEFAULT_PRICING.shippingChargeforRestofIndiaCOD,
   };
 };

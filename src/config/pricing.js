@@ -8,14 +8,29 @@ const getAmount = (name, fallback) => {
   return Number.isFinite(amount) && amount >= 0 ? amount : fallback;
 };
 
-const shippingCharge = getAmount("SHIPPING_CHARGE", 250);
+const shippingCharge = getAmount("SHIPPING_CHARGE", 179);
 
 export const DEFAULT_PRICING = {
-  freeShippingLimit: getAmount("FREE_SHIPPING_LIMIT", 1999),
+  freeShippingLimit: getAmount("FREE_SHIPPING_LIMIT", 999),
   shippingCharge,
   shippingChargeforCOD: getAmount(
     "SHIPPING_CHARGE_FOR_COD",
     shippingCharge,
   ),
-  platformFee: getAmount("PLATFORM_FEE", 23),
+  platformFee: getAmount("PLATFORM_FEE", 0),
+  shippingChargeforChennai: getAmount("SHIPPING_CHARGE_CHENNAI", 49),
+  shippingChargeforChennaiCOD: getAmount("SHIPPING_CHARGE_CHENNAI_COD", 59),
+  shippingChargeforTamilNadu: getAmount("SHIPPING_CHARGE_TAMIL_NADU", 79),
+  shippingChargeforTamilNaduCOD: getAmount(
+    "SHIPPING_CHARGE_TAMIL_NADU_COD",
+    89,
+  ),
+  shippingChargeforRestofIndia: getAmount(
+    "SHIPPING_CHARGE_REST_OF_INDIA",
+    169,
+  ),
+  shippingChargeforRestofIndiaCOD: getAmount(
+    "SHIPPING_CHARGE_REST_OF_INDIA_COD",
+    179,
+  ),
 };

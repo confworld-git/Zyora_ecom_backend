@@ -10,6 +10,12 @@ const settingsSchema = new mongoose.Schema(
     shippingCharge: { type: Number, min: 0 },
     shippingChargeforCOD: { type: Number, min: 0 },
     platformFee: { type: Number, min: 0 },
+    shippingChargeforChennai: { type: Number, min: 0 },
+    shippingChargeforChennaiCOD: { type: Number, min: 0 },
+    shippingChargeforTamilNadu: { type: Number, min: 0 },
+    shippingChargeforTamilNaduCOD: { type: Number, min: 0 },
+    shippingChargeforRestofIndia: { type: Number, min: 0 },
+    shippingChargeforRestofIndiaCOD: { type: Number, min: 0 },
   },
   { timestamps: true },
 );

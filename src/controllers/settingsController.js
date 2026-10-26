@@ -1,11 +1,19 @@
 import Settings from "../schemas/Settings.js";
 import { getPricing } from "../utils/getPricing.js";
+import {
+  calculateShippingFee,
+  getShippingRegionLabel,
+} from "../utils/shippingPricing.js";
 
 const FIELDS = [
   "freeShippingLimit",
-  "shippingCharge",
-  "shippingChargeforCOD",
   "platformFee",
+  "shippingChargeforChennai",
+  "shippingChargeforChennaiCOD",
+  "shippingChargeforTamilNadu",
+  "shippingChargeforTamilNaduCOD",
+  "shippingChargeforRestofIndia",
+  "shippingChargeforRestofIndiaCOD",
 ];
 const MAX_VALUE = 100000;
 
@@ -22,7 +30,63 @@ export const getPricingSettings = async (req, res) => {
   }
 };
 
-// PUT /api/config/pricing  (admin only)  body: { freeShippingLimit?, shippingCharge?, shippingChargeforCOD?, platformFee? }
+export const getShippingQuote = async (req, res) => {
+  const { shippingAddress, paymentMethod, subtotal: rawSubtotal } =
+    req.body || {};
+  const subtotal = Number(rawSubtotal);
+
+  if (
+    typeof shippingAddress?.city !== "string" ||
+    !shippingAddress.city.trim() ||
+    typeof shippingAddress?.state !== "string" ||
+    !shippingAddress.state.trim() ||
+    !/^\d{6}$/.test(String(shippingAddress?.pinCode || "").trim())
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "A valid delivery city, state, and 6-digit PIN code are required",
+    });
+  }
+  if (!["cod", "online"].includes(paymentMethod)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid payment method",
+    });
+  }
+  if (!Number.isFinite(subtotal) || subtotal < 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid cart subtotal",
+    });
+  }
+
+  try {
+    const pricing = await getPricing();
+    const { region, shippingFee } = calculateShippingFee({
+      address: shippingAddress,
+      paymentMethod,
+      subtotal,
+      pricing,
+    });
+
+    return res.status(200).json({
+      success: true,
+      shippingQuote: {
+        region,
+        regionLabel: getShippingRegionLabel(region),
+        shippingFee,
+      },
+    });
+  } catch (error) {
+    console.error("Get Shipping Quote Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to calculate shipping",
+    });
+  }
+};
+
+// PUT /api/config/pricing (admin only)
 export const updatePricingSettings = async (req, res) => {
   try {
     const update = {};

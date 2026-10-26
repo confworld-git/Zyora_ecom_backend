@@ -41,6 +41,10 @@ const orderSchema = new mongoose.Schema(
     },
 
     subtotal: { type: Number, required: true },
+    shippingRegion: {
+      type: String,
+      enum: ["chennai", "tamil_nadu", "rest_of_india"],
+    },
     shippingFee: { type: Number, default: 0 },
     platformFee: { type: Number, default: 0 },
     couponCode: { type: String, default: null },
