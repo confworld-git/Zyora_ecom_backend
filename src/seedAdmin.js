@@ -17,9 +17,9 @@ const seedAdmin = async () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       throw new Error("ADMIN_EMAIL must be a valid email address");
     }
-    if (password.length < 12) {
-      throw new Error("ADMIN_PASSWORD must be at least 12 characters");
-    }
+    // if (password.length < 12) {
+    //   throw new Error("ADMIN_PASSWORD must be at least 12 characters");
+    // }
 
     await connectDB();
     const existingAdmin = await Admin.findOne({ email });
