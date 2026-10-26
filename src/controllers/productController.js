@@ -1,6 +1,9 @@
 import Product from "../schemas/Product.js";
 import cloudinary from "../config/cloudinary.js";
-import { upsertProductToSheet } from "../utils/Googlesheets.js";
+import {
+  syncProductByIdToSheet,
+  upsertProductToSheet,
+} from "../utils/Googlesheets.js";
 import {
   hasColorStock,
   normalizeColor,
@@ -1072,6 +1075,9 @@ export const updateProductStock = async (req, res) => {
       );
       product.stock = summarizeColorStock(product.variants.colorStock);
       await product.save();
+      syncProductByIdToSheet(product.id).catch((error) =>
+        console.error("Google Sheets stock backup failed:", error.message),
+      );
 
       return res.status(200).json({
         success: true,
@@ -1120,6 +1126,10 @@ export const updateProductStock = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Product not found" });
     }
+
+    syncProductByIdToSheet(product.id).catch((error) =>
+      console.error("Google Sheets stock backup failed:", error.message),
+    );
 
     return res.status(200).json({ success: true, product });
   } catch (error) {

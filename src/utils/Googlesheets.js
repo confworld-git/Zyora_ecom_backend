@@ -154,6 +154,21 @@ function formatDate(value) {
   return date.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 }
 
+function createProductSlug(product) {
+  return String(product.name || product.title || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getFrontendUrl() {
+  return (process.env.FRONTEND_URL || "http://localhost:5173").replace(
+    /\/$/,
+    "",
+  );
+}
+
 function getImageUrls(product) {
   const possibleImages =
     product.images ??
@@ -196,6 +211,38 @@ function columnLetter(index) {
   return letters;
 }
 
+async function ensureSheetHasColumns(sheets, spreadsheetId, columnCount) {
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(sheetId,title,gridProperties(columnCount)))",
+  });
+  const sheet = spreadsheet.data.sheets?.find(
+    ({ properties }) => properties?.title === SHEET_NAME,
+  );
+
+  if (!sheet) {
+    throw new Error(`Google Sheets tab "${SHEET_NAME}" was not found`);
+  }
+
+  const currentColumnCount = sheet.properties.gridProperties?.columnCount || 0;
+  if (currentColumnCount >= columnCount) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          appendDimension: {
+            sheetId: sheet.properties.sheetId,
+            dimension: "COLUMNS",
+            length: columnCount - currentColumnCount,
+          },
+        },
+      ],
+    },
+  });
+}
+
 // --------------------------------------------------
 // Normalize a product from the backend API
 // Adjust these mappings if your MongoDB schema differs.
@@ -204,6 +251,11 @@ function columnLetter(index) {
 function normalizeProduct(product) {
   const obj = (v) => (v && typeof v === "object" ? v : {});
 
+  const id = getValue(
+    product,
+    ["id", "productId", "product_id", "sku", "_id"],
+    "",
+  );
   const price = obj(product.price);
   const rating = obj(product.rating);
   const stock = obj(product.stock);
@@ -230,11 +282,7 @@ function normalizeProduct(product) {
   );
 
   return {
-    "product id": getValue(
-      product,
-      ["id", "productId", "product_id", "sku", "_id"],
-      "",
-    ),
+    "product id": id,
     name: getValue(product, ["name", "productName", "product_name"], ""),
     category: getValue(product, ["category", "productCategory"], ""),
     subcategory: getValue(
@@ -308,7 +356,13 @@ function normalizeProduct(product) {
     colours: Array.isArray(colours) ? colours.join(", ") : colours,
     sizes: Array.isArray(sizes) ? sizes.join(", ") : sizes,
     "image urls": getImageUrls(product),
-    "product url": getValue(product, ["product_url", "productUrl", "url"], ""),
+    "product url":
+      getValue(product, ["product_url", "productUrl", "url"], "") ||
+      (id && createProductSlug(product)
+        ? `${getFrontendUrl()}/Zyora_Category/product/${encodeURIComponent(
+            id,
+          )}/${encodeURIComponent(createProductSlug(product))}`
+        : ""),
     "created at": formatDate(
       getValue(product, ["createdAt", "created_at"], objectIdDate(product._id)),
     ),
@@ -344,13 +398,14 @@ async function doSync(products) {
   let headers = rows[0] || [];
 
   if (headers.length === 0) {
+    headers = DEFAULT_HEADERS;
+    await ensureSheetHasColumns(sheets, spreadsheetId, headers.length);
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${QUOTED_SHEET}!A1`,
       valueInputOption: "RAW",
-      requestBody: { values: [DEFAULT_HEADERS] },
+      requestBody: { values: [headers] },
     });
-    headers = DEFAULT_HEADERS;
   } else {
     const existingCanonical = new Set(
       headers.map(canonicalFromHeader).filter(Boolean),
@@ -361,6 +416,11 @@ async function doSync(products) {
     if (missingHeaders.length > 0) {
       const firstColumn = headers.length;
       const lastColumn = firstColumn + missingHeaders.length - 1;
+      await ensureSheetHasColumns(
+        sheets,
+        spreadsheetId,
+        lastColumn + 1,
+      );
       await sheets.spreadsheets.values.update({
         spreadsheetId,
         range: `${QUOTED_SHEET}!${columnLetter(firstColumn)}1:${columnLetter(lastColumn)}1`,
@@ -482,9 +542,25 @@ export function upsertProductToSheet(product) {
   return syncProductsToSheet([product]);
 }
 
+export async function syncProductByIdToSheet(productId) {
+  const product = await Product.findOne({ id: productId });
+  if (!product) return null;
+  return upsertProductToSheet(product);
+}
+
 // Copies every product in the database into the sheet.
 // Call this once when the server starts; unchanged rows are skipped.
 export async function backfillAllProducts() {
-  const products = await Product.find().sort({ createdAt: 1 }).lean();
-  return syncProductsToSheet(products);
+  const products = await Product.find().sort({ createdAt: 1 });
+  const result = await syncProductsToSheet(products);
+  const categoryCounts = new Map();
+  products.forEach((product) => {
+    const category = String(product.category || "").trim() || "(uncategorized)";
+    categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+  });
+  return {
+    ...result,
+    scanned: products.length,
+    categories: Object.fromEntries(categoryCounts),
+  };
 }

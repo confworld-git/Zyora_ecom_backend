@@ -71,11 +71,15 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   backfillAllProducts()
-    .then((r) =>
+    .then((r) => {
       console.log(
-        `Google Sheets backup: added ${r.added}, updated ${r.updated}, unchanged ${r.unchanged}`,
-      ),
-    )
+        `Google Sheets backup: scanned ${r.scanned}, added ${r.added}, updated ${r.updated}, unchanged ${r.unchanged}, missing IDs ${r.missingId}`,
+      );
+      console.log(
+        "Google Sheets products by category:",
+        JSON.stringify(r.categories),
+      );
+    })
     .catch((err) => console.error("Google Sheets backup failed:", err.message));
 });
 

@@ -1,9 +1,16 @@
 import Product from "../schemas/Product.js";
+import { syncProductByIdToSheet } from "./Googlesheets.js";
 
 export const normalizeColor = (color) =>
   String(color ?? "")
     .trim()
     .toLowerCase();
+
+const syncStockChangeToSheet = (productId) => {
+  syncProductByIdToSheet(productId).catch((error) => {
+    console.error("Google Sheets stock backup failed:", error.message);
+  });
+};
 
 export const hasColorStock = (product) =>
   Array.isArray(product?.variants?.colorStock) &&
@@ -153,6 +160,7 @@ export const decrementProductStock = async (
       ],
       { updatePipeline: true },
     );
+    if (result.modifiedCount === 1) syncStockChangeToSheet(product.id);
     return result.modifiedCount === 1;
   }
 
@@ -176,6 +184,7 @@ export const decrementProductStock = async (
     ],
     { updatePipeline: true },
   );
+  if (result.modifiedCount === 1) syncStockChangeToSheet(product.id);
   return result.modifiedCount === 1;
 };
 
@@ -246,14 +255,16 @@ export const restoreProductStock = async (
     if (result.modifiedCount !== 1) {
       throw new Error(`Unable to restore stock for ${productId} (${color})`);
     }
+    syncStockChangeToSheet(productId);
     return;
   }
 
-  await Product.updateOne(
+  const result = await Product.updateOne(
     { id: productId },
     {
       $inc: { "stock.quantity": quantity },
       $set: { "stock.in_stock": true },
     },
   );
+  if (result.modifiedCount === 1) syncStockChangeToSheet(productId);
 };
