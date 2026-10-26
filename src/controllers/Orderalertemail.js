@@ -1,4 +1,5 @@
 import { sendEmail } from "../utils/emailService.js";
+import Customer from "../schemas/Customer.js";
 
 const BRAND = "ZYORA";
 const getAdminUrl = () =>
@@ -39,6 +40,7 @@ export function buildAdminOrderEmail(orderInput, opts = {}) {
     typeof orderInput.toObject === "function"
       ? orderInput.toObject()
       : orderInput;
+  const customerId = opts.customerId || o.customerId || "";
   const a = o.shippingAddress || {};
   const isCod = o.paymentMethod === "cod";
   const itemCount = o.items.reduce((n, i) => n + i.quantity, 0);
@@ -179,7 +181,7 @@ export function buildAdminOrderEmail(orderInput, opts = {}) {
         ${totalsRow("Platform fee", inr(o.platformFee))}
         <tr><td colspan="2" style="border-top:2px solid #111;padding-top:6px;"></td></tr>
         ${totalsRow(isCod ? "Total to collect" : "Order total", inr(o.total), true, "#111")}
-        ${savings > 0 ? `<tr><td colspan="2" style="padding-top:4px;font-size:12px;color:#176B3A;">Customer saved ${inr(savings)} vs MRP</td></tr>` : ""}
+        ${savings > 0 ? `<tr><td colspan="2" style="padding-top:4px;font-size:12px;color:#176B3A;">Customer saved ${inr(savings)}</td></tr>` : ""}
       </table>
     </td></tr>
 
@@ -207,7 +209,7 @@ export function buildAdminOrderEmail(orderInput, opts = {}) {
     <tr><td style="padding:12px 24px 20px 24px;font-size:12px;color:#6B7280;line-height:1.7;">
       Payment: <b style="color:#111;">${esc(String(o.paymentMethod).toUpperCase())}</b> (${esc(o.paymentStatus)})
       &nbsp;|&nbsp; Status: <b style="color:#111;">${esc(o.orderStatus)}</b><br>
-      Customer ID: ${esc(String(o.customer))}
+      Customer ID: ${esc(customerId)}
     </td></tr>
 
     <!-- footer -->
@@ -242,6 +244,7 @@ export function buildAdminOrderEmail(orderInput, opts = {}) {
     `Shipping: ${inr(o.shippingFee)}`,
     `Platform fee: ${inr(o.platformFee)}`,
     `TOTAL: ${inr(o.total)}`,
+    `Customer ID: ${customerId}`,
     "",
     "SHIP TO",
     titleCase(a.name),
@@ -260,7 +263,17 @@ export function buildAdminOrderEmail(orderInput, opts = {}) {
 export async function sendAdminOrderEmail(order) {
   try {
     if (!process.env.ADMIN_EMAIL) throw new Error("ADMIN_EMAIL is not set");
-    const { subject, html, text } = buildAdminOrderEmail(order);
+    const customerId =
+      order.customerId ||
+      order.customer?.customerId ||
+      (
+        await Customer.findById(order.customer?._id || order.customer)
+          .select("customerId")
+          .lean()
+      )?.customerId;
+    const { subject, html, text } = buildAdminOrderEmail(order, {
+      customerId,
+    });
     await sendEmail({ to: process.env.ADMIN_EMAIL, subject, html, text });
   } catch (err) {
     console.error("Admin order email failed:", err.message); // never break the order flow
