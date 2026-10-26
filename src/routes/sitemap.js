@@ -21,9 +21,25 @@ const createProductSlug = (product) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const isImitationJewelleryCategory = (category) => {
+  const normalizedCategory = String(category || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+  return [
+    "imitationjewellery",
+    "imitationjewelry",
+    "immitationjewellery",
+    "immitationjewelry",
+  ].some((name) => normalizedCategory.includes(name));
+};
+
 router.get("/", async (req, res) => {
   try {
-    const products = await Product.find({}, "id name title updatedAt").lean();
+    const products = await Product.find(
+      {},
+      "id name title category updatedAt",
+    ).lean();
 
     const frontendUrl = getFrontendUrl();
 
@@ -33,11 +49,35 @@ router.get("/", async (req, res) => {
       "/Contact_Us",
       "/Zyora_Category",
       "/Jewellery",
+      "/policies?policy=shipping",
+      "/policies?policy=returns",
+      "/policies?policy=terms",
+      "/policies?policy=privacy",
     ];
 
     const urls = staticPaths.map((path) => ({
       loc: `${frontendUrl}${path}`,
     }));
+
+    const categories = new Map();
+    products.forEach(({ category }) => {
+      const name = String(category || "").trim();
+      const key = name.toLowerCase();
+
+      if (name && !isImitationJewelleryCategory(name) && !categories.has(key)) {
+        categories.set(key, name);
+      }
+    });
+
+    [...categories.values()]
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((category) => {
+        urls.push({
+          loc: `${frontendUrl}/Zyora_Category?category=${encodeURIComponent(
+            category,
+          )}`,
+        });
+      });
 
     products.forEach((product) => {
       const slug = createProductSlug(product);
