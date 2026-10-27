@@ -12,7 +12,7 @@ const escapeXml = (value) =>
     .replaceAll("'", "&apos;");
 
 const getFrontendUrl = () =>
-  (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+  (process.env.FRONTEND_URL || "https://zyoraecom.in").replace(/\/$/, "");
 
 const createProductSlug = (product) =>
   (product.name || product.title || "")
