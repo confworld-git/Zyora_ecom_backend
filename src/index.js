@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
+import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
@@ -21,10 +22,10 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import { expirePendingOnlinePayments } from "./controllers/orderController.js";
 import couriers from "./routes/couriers.js";
 import { backfillAllProducts } from "./utils/Googlesheets.js";
+import seedAdmin from "./seedAdmin.js";
+import seedProducts from "./seedProducts.js";
 
 const app = express();
-connectDB();
-initCloudinary();
 
 app.use(
   cors({
@@ -66,29 +67,52 @@ app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api", couriers);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  backfillAllProducts()
-    .then((r) => {
-      console.log(
-        `Google Sheets backup: scanned ${r.scanned}, added ${r.added}, updated ${r.updated}, unchanged ${r.unchanged}, missing IDs ${r.missingId}`,
+const startServer = async () => {
+  await connectDB();
+
+  if (process.env.npm_lifecycle_event === "dev") {
+    await seedAdmin();
+    await seedProducts();
+  }
+
+  initCloudinary();
+
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    backfillAllProducts()
+      .then((r) => {
+        console.log(
+          `Google Sheets backup: scanned ${r.scanned}, added ${r.added}, updated ${r.updated}, unchanged ${r.unchanged}, missing IDs ${r.missingId}`,
+        );
+        console.log(
+          "Google Sheets products by category:",
+          JSON.stringify(r.categories),
+        );
+      })
+      .catch((err) =>
+        console.error("Google Sheets backup failed:", err.message),
       );
-      console.log(
-        "Google Sheets products by category:",
-        JSON.stringify(r.categories),
-      );
-    })
-    .catch((err) => console.error("Google Sheets backup failed:", err.message));
+  });
+
+  const pendingPaymentCleanup = setInterval(
+    () => {
+      expirePendingOnlinePayments().catch((error) => {
+        console.error("Pending payment cleanup failed:", error);
+      });
+    },
+    5 * 60 * 1000,
+  );
+  pendingPaymentCleanup.unref();
+};
+
+startServer().catch(async (error) => {
+  console.error("Server startup failed:", error.message);
+  try {
+    await mongoose.disconnect();
+  } catch (disconnectError) {
+    console.error("MongoDB disconnect failed:", disconnectError.message);
+  }
+  process.exitCode = 1;
 });
-
-const pendingPaymentCleanup = setInterval(
-  () => {
-    expirePendingOnlinePayments().catch((error) => {
-      console.error("Pending payment cleanup failed:", error);
-    });
-  },
-  5 * 60 * 1000,
-);
-pendingPaymentCleanup.unref();
