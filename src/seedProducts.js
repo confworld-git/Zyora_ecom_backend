@@ -14,10 +14,6 @@ const FILE = path.join(__dirname, "zyora.products.json");
 
 const seedProducts = async () => {
   const collection = mongoose.connection.collection("products");
-  if ((await collection.countDocuments()) > 0) {
-    return false;
-  }
-
   const raw = fs.readFileSync(FILE, "utf8");
   const products = EJSON.parse(raw);
 
@@ -25,11 +21,36 @@ const seedProducts = async () => {
     throw new Error("File must contain a JSON array of products");
   }
 
-  const result = await collection.insertMany(products, { ordered: false });
-  console.log(
-    `Imported ${result.insertedCount} products into ${mongoose.connection.name}`
+  const productIds = new Set();
+  for (const product of products) {
+    if (typeof product.id !== "string" || !product.id.trim() || !product._id) {
+      throw new Error("Every seeded product must have an id and _id");
+    }
+    if (productIds.has(product.id)) {
+      throw new Error(`Duplicate product id in seed file: ${product.id}`);
+    }
+    productIds.add(product.id);
+  }
+
+  const result = await collection.bulkWrite(
+    products.map((product) => ({
+      updateOne: {
+        filter: {
+          $or: [{ id: product.id }, { _id: product._id }],
+        },
+        update: { $setOnInsert: product },
+        upsert: true,
+      },
+    })),
+    { ordered: false },
   );
-  return true;
+
+  if (result.upsertedCount > 0) {
+    console.log(
+      `Imported ${result.upsertedCount} missing products into ${mongoose.connection.name}`,
+    );
+  }
+  return result.upsertedCount;
 };
 
 export default seedProducts;

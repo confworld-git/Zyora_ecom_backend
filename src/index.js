@@ -72,7 +72,10 @@ const PORT = process.env.PORT || 5001;
 const startServer = async () => {
   await connectDB();
 
-  if (process.env.npm_lifecycle_event === "dev") {
+  if (
+    process.env.npm_lifecycle_event === "dev" ||
+    process.env.SEED_ON_START === "true"
+  ) {
     await seedAdmin();
     await seedProducts();
   }
