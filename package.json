@@ -23,6 +23,7 @@
     "express": "^5.2.1",
     "google-auth-library": "^11.1.0",
     "googleapis": "^186.0.0",
+    "html2pdf.js": "^0.14.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.1",
     "multer": "^2.4.0",

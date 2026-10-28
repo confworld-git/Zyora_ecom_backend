@@ -161,6 +161,7 @@ router.post("/admin/orders/:id/send", async (req, res) => {
     order = await Order.findOneAndUpdate(
       {
         _id: req.params.id,
+        shippingMethod: "shiprocket",
         orderStatus: {
           $nin: ["cancelled", "refunded", "shipped", "delivered"],
         },
@@ -192,13 +193,20 @@ router.post("/admin/orders/:id/send", async (req, res) => {
     if (!order) {
       const existing = await Order.findById(req.params.id)
         .select(
-          "shipment.shipmentId shipment.shiprocketOrderId shipment.submissionState",
+          "shippingMethod shipment.shipmentId shipment.shiprocketOrderId shipment.submissionState",
         )
         .lean();
       if (!existing) {
         return res
           .status(404)
           .json({ success: false, error: "Order not found." });
+      }
+      if (existing.shippingMethod !== "shiprocket") {
+        return res.status(409).json({
+          success: false,
+          error:
+            "Select Shiprocket as the shipping method before sending this order.",
+        });
       }
       if (
         existing.shipment?.shipmentId ||
@@ -320,6 +328,7 @@ router.post("/admin/orders/:id/send", async (req, res) => {
     order.shipment.submissionState = "sent";
     order.shipment.package = packageDetails;
     order.shipment.status = "Sent to Shiprocket; courier assignment pending";
+    order.shippingMethod = "shiprocket";
     order.orderStatus = "confirmed";
     order.shipment.locked = false;
     order.shipment.lockedAt = null;

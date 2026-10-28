@@ -910,7 +910,7 @@ export const getMyOrderTracking = async (req, res) => {
       : { orderId: id, customer: req.customer.id };
     order = await Order.findOne(filter)
       .select(
-        "orderId orderStatus paymentMethod paymentStatus shipment.shipmentId shipment.courierName shipment.awb shipment.status shipment.submissionState createdAt updatedAt",
+        "orderId orderStatus paymentMethod paymentStatus shippingMethod shipment.shipmentId shipment.courierName shipment.awb shipment.trackingNumber shipment.trackingUrl shipment.status shipment.submissionState shipment.shiprocketDeletedAt createdAt updatedAt",
       )
       .lean();
 
@@ -921,6 +921,34 @@ export const getMyOrderTracking = async (req, res) => {
     }
 
     const shipment = order.shipment || {};
+    const shippingMethod =
+      order.shippingMethod ||
+      (shipment.shipmentId || shipment.awb ? "shiprocket" : "self");
+    if (shippingMethod === "self") {
+      const trackingNumber = shipment.trackingNumber || "";
+      return res.status(200).json({
+        success: true,
+        tracking: {
+          orderId: order.orderId,
+          orderStatus: order.orderStatus,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          shippingMethod: "self",
+          courierName: shipment.courierName || "",
+          trackingNumber,
+          trackingUrl: shipment.trackingUrl || "",
+          awb: "",
+          shipmentStatus:
+            shipment.status ||
+            (trackingNumber
+              ? "Tracking details added by the seller"
+              : "Self-shipping; tracking details not added yet"),
+          timeline: [],
+          trackingAvailable: Boolean(trackingNumber),
+        },
+      });
+    }
+
     if (!shipment.shipmentId && !shipment.awb) {
       const submissionNeedsReview = ["submitting", "unknown"].includes(
         shipment.submissionState,
@@ -932,11 +960,14 @@ export const getMyOrderTracking = async (req, res) => {
           orderStatus: order.orderStatus,
           paymentMethod: order.paymentMethod,
           paymentStatus: order.paymentStatus,
+          shippingMethod,
           courierName: "",
           awb: "",
           shipmentStatus: submissionNeedsReview
             ? "Shiprocket submission pending verification"
-            : "Not sent to Shiprocket",
+            : shipment.shiprocketDeletedAt
+              ? "Previous Shiprocket shipment deleted; awaiting new tracking"
+              : "Not sent to Shiprocket",
           timeline: [],
           trackingAvailable: false,
         },
@@ -1099,6 +1130,13 @@ export const getAdminOrders = async (_req, res) => {
       .populate("customer", "name email mobile")
       .sort({ createdAt: -1 })
       .lean();
+    orders.forEach((order) => {
+      if (order.shipment?.shipmentId || order.shipment?.awb) {
+        order.shippingMethod = "shiprocket";
+      } else {
+        order.shippingMethod = order.shippingMethod || "self";
+      }
+    });
 
     return res.status(200).json({ success: true, orders });
   } catch (error) {
@@ -1106,6 +1144,71 @@ export const getAdminOrders = async (_req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Failed to fetch orders" });
+  }
+};
+
+export const markShiprocketShipmentDeleted = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID",
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      "shipment.locked": { $ne: true },
+    });
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found or a shipment operation is in progress",
+      });
+    }
+    if (!order.shipment?.shipmentId && !order.shipment?.awb) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "No recorded Shiprocket shipment is available to mark as deleted.",
+      });
+    }
+
+    order.shippingMethod = "shiprocket";
+    order.shipment.shiprocketDeletedOrderId =
+      order.shipment.shiprocketOrderId || null;
+    order.shipment.shiprocketDeletedShipmentId =
+      order.shipment.shipmentId || null;
+    order.shipment.shiprocketDeletedAt = new Date();
+    order.shipment.shiprocketDeletedBy = String(req.admin?.id || "");
+    order.shipment.shiprocketOrderId = null;
+    order.shipment.shipmentId = null;
+    order.shipment.courierId = null;
+    order.shipment.courierName = "";
+    order.shipment.awb = "";
+    order.shipment.trackingNumber = "";
+    order.shipment.trackingUrl = "";
+    order.shipment.submissionState = "not_sent";
+    order.shipment.status = "Shiprocket shipment deletion verified by admin";
+    order.shipment.locked = false;
+    order.shipment.lockedAt = null;
+    await order.save();
+
+    const updated = await Order.findById(order._id)
+      .populate("customer", "name email mobile")
+      .lean();
+    return res.status(200).json({
+      success: true,
+      order: updated,
+      message:
+        "Shiprocket tracking was cleared. You can now update the order or submit it to Shiprocket again.",
+    });
+  } catch (error) {
+    console.error("Mark Shiprocket shipment deleted error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update the Shiprocket shipment",
+    });
   }
 };
 
@@ -1127,7 +1230,23 @@ export const updateAdminOrder = async (req, res) => {
       });
     }
 
-    const { orderStatus, paymentStatus, shippingAddress } = req.body;
+    const {
+      orderStatus,
+      paymentStatus,
+      shippingAddress,
+      shippingMethod,
+      trackingNumber,
+      trackingUrl,
+      courierName,
+    } = req.body;
+    const hasActiveShipment = Boolean(
+      order.shipment?.awb || order.shipment?.shipmentId,
+    );
+    const currentShippingMethod =
+      order.shippingMethod === "shiprocket" || hasActiveShipment
+        ? "shiprocket"
+        : "self";
+    const nextShippingMethod = shippingMethod ?? currentShippingMethod;
 
     if (orderStatus !== undefined && !ORDER_STATUSES.includes(orderStatus)) {
       return res
@@ -1137,7 +1256,7 @@ export const updateAdminOrder = async (req, res) => {
     if (
       orderStatus !== undefined &&
       orderStatus !== order.orderStatus &&
-      (order.shipment?.awb || order.shipment?.shipmentId)
+      hasActiveShipment
     ) {
       return res.status(409).json({
         success: false,
@@ -1147,7 +1266,7 @@ export const updateAdminOrder = async (req, res) => {
     }
     if (
       shippingAddress !== undefined &&
-      (order.shipment?.awb || order.shipment?.shipmentId)
+      hasActiveShipment
     ) {
       return res.status(409).json({
         success: false,
@@ -1156,14 +1275,97 @@ export const updateAdminOrder = async (req, res) => {
       });
     }
     if (
+      shippingMethod !== undefined &&
+      !["self", "shiprocket"].includes(shippingMethod)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid shipping method",
+      });
+    }
+    if (
+      shippingMethod !== undefined &&
+      shippingMethod !== currentShippingMethod &&
+      hasActiveShipment
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Mark the Shiprocket shipment as deleted before changing shipping method.",
+      });
+    }
+    if (
       ["shipped", "delivered"].includes(orderStatus) &&
-      orderStatus !== order.orderStatus
+      orderStatus !== order.orderStatus &&
+      hasActiveShipment
     ) {
       return res.status(409).json({
         success: false,
         message:
           "Shipped and delivered statuses are updated by the courier webhook.",
       });
+    }
+    if (
+      ["shipped", "delivered"].includes(orderStatus) &&
+      orderStatus !== order.orderStatus &&
+      nextShippingMethod === "shiprocket" &&
+      !order.shipment?.shiprocketDeletedAt &&
+      !hasActiveShipment
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Submit the order to Shiprocket before setting a manual delivery status.",
+      });
+    }
+    if (
+      [trackingNumber, trackingUrl, courierName].some(
+        (value) => value !== undefined,
+      ) &&
+      nextShippingMethod !== "self"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Manual tracking details are only available for self-shipping.",
+      });
+    }
+    if (
+      trackingNumber !== undefined &&
+      (typeof trackingNumber !== "string" || trackingNumber.trim().length > 120)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Tracking number must be 120 characters or fewer.",
+      });
+    }
+    if (
+      courierName !== undefined &&
+      (typeof courierName !== "string" || courierName.trim().length > 120)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Carrier name must be 120 characters or fewer.",
+      });
+    }
+    if (trackingUrl !== undefined) {
+      if (typeof trackingUrl !== "string" || trackingUrl.trim().length > 500) {
+        return res.status(400).json({
+          success: false,
+          message: "Tracking URL must be 500 characters or fewer.",
+        });
+      }
+      if (trackingUrl.trim()) {
+        try {
+          if (new URL(trackingUrl).protocol !== "https:") {
+            throw new Error("Tracking URL must use HTTPS");
+          }
+        } catch {
+          return res.status(400).json({
+            success: false,
+            message: "Enter a valid HTTPS tracking URL.",
+          });
+        }
+      }
     }
     if (
       paymentStatus !== undefined &&
@@ -1186,7 +1388,7 @@ export const updateAdminOrder = async (req, res) => {
     if (
       paymentStatus === "paid" &&
       order.paymentMethod === "cod" &&
-      order.orderStatus !== "delivered"
+      (orderStatus ?? order.orderStatus) !== "delivered"
     ) {
       return res.status(409).json({
         success: false,
@@ -1198,7 +1400,8 @@ export const updateAdminOrder = async (req, res) => {
       paymentStatus !== undefined &&
       paymentStatus !== order.paymentStatus &&
       order.paymentMethod === "cod" &&
-      order.orderStatus === "delivered"
+      order.orderStatus === "delivered" &&
+      currentShippingMethod === "shiprocket"
     ) {
       return res.status(409).json({
         success: false,
@@ -1309,6 +1512,25 @@ export const updateAdminOrder = async (req, res) => {
 
     if (orderStatus !== undefined) order.orderStatus = orderStatus;
     if (paymentStatus !== undefined) order.paymentStatus = paymentStatus;
+    order.shippingMethod = nextShippingMethod;
+    if (nextShippingMethod === "shiprocket" && shippingMethod !== undefined) {
+      order.shipment.trackingNumber = "";
+      order.shipment.trackingUrl = "";
+      order.shipment.courierName = "";
+    } else if (nextShippingMethod === "self") {
+      if (trackingNumber !== undefined) {
+        order.shipment.trackingNumber = trackingNumber.trim();
+      }
+      if (trackingUrl !== undefined) {
+        order.shipment.trackingUrl = trackingUrl.trim();
+      }
+      if (courierName !== undefined) {
+        order.shipment.courierName = courierName.trim();
+      }
+      if (orderStatus !== undefined) {
+        order.shipment.status = orderStatus.replaceAll("_", " ");
+      }
+    }
     await order.save();
     stockAdjustments.length = 0;
 

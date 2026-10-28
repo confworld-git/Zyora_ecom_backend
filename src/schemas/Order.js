@@ -52,6 +52,11 @@ const orderSchema = new mongoose.Schema(
     total: { type: Number, required: true },
 
     paymentMethod: { type: String, enum: ["cod", "online"], default: "cod" },
+    shippingMethod: {
+      type: String,
+      enum: ["self", "shiprocket"],
+      default: "self",
+    },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed", "refunding", "refunded"],
@@ -88,6 +93,12 @@ const orderSchema = new mongoose.Schema(
       courierId: { type: Number, default: null },
       courierName: { type: String, default: "" },
       awb: { type: String, default: "", index: true },
+      trackingNumber: { type: String, default: "" },
+      trackingUrl: { type: String, default: "" },
+      shiprocketDeletedOrderId: { type: Number, default: null },
+      shiprocketDeletedShipmentId: { type: Number, default: null },
+      shiprocketDeletedAt: { type: Date, default: null },
+      shiprocketDeletedBy: { type: String, default: "" },
       status: { type: String, default: "" },
       package: {
         length: { type: Number, default: null },
