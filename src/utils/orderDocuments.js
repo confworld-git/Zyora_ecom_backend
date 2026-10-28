@@ -282,108 +282,293 @@ export const createShippingLabelHtml = (order) => {
   return `<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Priority package label 4x6</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
     <style>
-      @page { size: 4in 6in; margin: 0; }
-      * { box-sizing: border-box; }
-      :root { --ink: #454b50; }
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      :root {
+        --ink: #000000;
+      }
+
+      html,
       body {
         margin: 0;
-        padding: 24px 0;
-        background: #e9e9e9;
-        font-family: Montserrat, Arial, Helvetica, sans-serif;
+        padding: 0;
+        font-family: "Times New Roman", Times, serif;
         color: var(--ink);
       }
+
+      body {
+        padding: 24px 0;
+        background: #e9e9e9;
+      }
+
+      .label {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto;
+        padding: 10mm;
+        background: #ffffff;
+      }
+
+      .sheet {
+        display: flex;
+        width: 100%;
+        min-height: 277mm;
+        flex-direction: column;
+      }
+
+      .row {
+        display: flex;
+        width: 100%;
+        border-bottom: 1.5px solid var(--ink);
+      }
+
+      .row:last-child {
+        border-bottom: 0;
+      }
+
+      .r1 {
+        min-height: 38mm;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .r1 img {
+        width: 28mm;
+        height: 28mm;
+        margin: 0 5mm 0 2mm;
+        object-fit: contain;
+      }
+
+      .r1 .date {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        flex-direction: column;
+        justify-content: center;
+        padding-left: 4mm;
+        font-size: 30px;
+        font-weight: 700;
+      }
+
+      .r1 .date p {
+        margin: 5px 0 0;
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 1.3;
+      }
+
+      .party {
+        min-height: 45mm;
+        align-items: flex-start;
+        padding: 7mm 4mm;
+        flex-shrink: 0;
+      }
+
+      .party .k {
+        width: 35mm;
+        flex: 0 0 35mm;
+        font-size: 19px;
+        font-weight: 700;
+      }
+
+      .party .v {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .party .v .name {
+        margin: 0 0 4mm;
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+      }
+
+      .party .v .addr {
+        font-size: 18px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+        word-break: normal;
+      }
+
+      .products {
+        min-height: 65mm;
+        flex: 1 0 auto;
+        align-items: flex-start;
+        padding: 7mm 4mm;
+      }
+
+      .products .k {
+        width: 35mm;
+        flex: 0 0 35mm;
+      }
+
+      .products .v {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .products table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 17px;
+      }
+
+      .products th,
+      .products td {
+        padding: 7px 4px;
+        text-align: right;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+      }
+
+      .products th {
+        font-weight: 700;
+      }
+
+      .products th:first-child,
+      .products td:first-child {
+        width: 42%;
+        text-align: left;
+      }
+
+      .products th:nth-child(2),
+      .products td:nth-child(2) {
+        width: 12%;
+      }
+
+      .products th:nth-child(3),
+      .products td:nth-child(3) {
+        width: 22%;
+      }
+
+      .products th:nth-child(4),
+      .products td:nth-child(4) {
+        width: 24%;
+      }
+
+      .products thead {
+        border-bottom: 1.5px solid var(--ink);
+      }
+
+      .products tbody tr {
+        border-bottom: 1px solid #999999;
+      }
+
+      .r5 {
+        min-height: 35mm;
+        flex-shrink: 0;
+      }
+
+      .r5 .cell {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 5mm 3mm;
+        border-right: 1.5px solid var(--ink);
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.8;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+
+      .r5 .cell:last-child {
+        border-right: 0;
+      }
+
+      [contenteditable="true"]:focus {
+        outline: 1px dashed #888888;
+        background: #fffbe0;
+      }
+
       .toolbar {
         max-width: 460px;
         margin: 0 auto 16px;
         text-align: center;
-        font-size: 14px;
-        color: #222;
+        font-size: 16px;
+        color: #222222;
       }
+
       .toolbar button {
-        padding: 8px 18px;
-        border: 1px solid #222;
-        background: #fff;
+        padding: 10px 20px;
+        border: 1px solid #222222;
+        background: #ffffff;
         font: inherit;
         cursor: pointer;
       }
-      .toolbar p { margin: 8px auto 0; line-height: 1.5; color: #444; }
-      .label {
-        width: 4in;
-        height: 6in;
-        margin: 0 auto;
-        padding: 0.13in;
-        background: white;
-      }
-      .sheet { display: flex; width: 100%; height: 100%; flex-direction: column; }
-      .row { display: flex; border-bottom: 1.5px solid var(--ink); }
-      .row:last-child { border-bottom: 0; }
-      [contenteditable]:focus { outline: 1px dashed #888; background: #fffbe0; }
-      .r1 { flex: 225; align-items: center; }
-      .r1 img {
-        width: 0.8in;
-        height: 0.8in;
-        margin: 0 0.12in;
-        object-fit: contain;
-      }
-      .r1 .date {
-        display: flex;
-        flex: 1;
-        flex-direction: column;
-        justify-content: center;
-        padding-left: 0.2in;
-        border-left: 1.5px solid var(--ink);
-        font-size: 13px;
-      }
-      .r1 .date b { margin-top: 4px; font-size: 12.5px; }
-      .party { flex: 420; align-items: center; padding: 0 0.22in; }
-      .party .k { width: 0.8in; flex: 0 0 0.8in; font-size: 12px; }
-      .party .v { min-width: 0; flex: 1; }
-      .party .v .name { margin-bottom: 6px; font-size: 13px; font-weight: 700; }
-      .party .v .addr { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
-      .products { align-items: flex-start; padding-top: 0.12in; }
-      .products .v { min-width: 0; flex: 1; }
-      .products table { width: 100%; border-collapse: collapse; font-size: 9px; }
-      .products th, .products td { padding: 3px 2px; text-align: right; vertical-align: top; }
-      .products th:first-child, .products td:first-child { width: 48%; text-align: left; overflow-wrap: anywhere; }
-      .products thead { border-bottom: 1px solid var(--ink); }
-      .r5 { flex: 195; }
-      .r5 .cell {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        align-items: center;
-        justify-content: center;
-        border-right: 1.5px solid var(--ink);
-        font-size: 11.5px;
+
+      .toolbar p {
+        margin: 8px auto 0;
         line-height: 1.5;
-        text-align: center;
+        color: #444444;
       }
-      .r5 .cell:last-child { border-right: 0; }
+
       @media print {
-        body { padding: 0; background: #fff; }
-        .toolbar { display: none; }
-        .label { margin: 0; print-color-adjust: exact; }
-        [contenteditable]:focus { outline: 0; background: none; }
+        @page {
+          size: A4 portrait;
+          margin: 0;
+        }
+
+        html,
+        body {
+          width: 210mm;
+          min-height: 297mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+        }
+
+        .toolbar {
+          display: none !important;
+        }
+
+        .label {
+          width: 210mm;
+          min-height: 297mm;
+          margin: 0;
+          padding: 10mm;
+          background: #ffffff;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+
+        .sheet {
+          min-height: 277mm;
+        }
+
+        [contenteditable="true"]:focus {
+          outline: none;
+          background: transparent;
+        }
       }
-      @media screen and (max-width: 4in) {
-        .label { width: 100vw; height: 150vw; }
+
+      @media screen and (max-width: 800px) {
+        body {
+          padding: 12px 0;
+          overflow-x: auto;
+        }
+
+        .label {
+          margin-left: 0;
+          margin-right: 0;
+        }
       }
     </style>
   </head>
   <body>
-  <div class="toolbar">
-      <button type="button" onclick="window.print()">Print / Save as PDF</button>
-    </div>
     <main class="label">
       <div class="sheet">
         <div class="row r1">
@@ -411,9 +596,12 @@ export const createShippingLabelHtml = (order) => {
         <div class="row party">
           <div class="k">To:</div>
           <div class="v">
-            <div class="name" contenteditable="true">${escapeHtml(address.name) || "Recipient name"}</div>
+            <div class="name" contenteditable="true">
+              ${escapeHtml(address.name) || "Recipient name"}
+            </div>
             <div class="addr" contenteditable="true">
-              ${recipientAddress || "Street address, city, state - PIN"}<br />Phone: ${escapeHtml(address.mobile) || "+91 00000 00000"}
+              ${recipientAddress || "Street address, city, state - PIN"}<br />Phone:
+              ${escapeHtml(address.mobile) || "+91 00000 00000"}
             </div>
           </div>
         </div>
@@ -421,17 +609,37 @@ export const createShippingLabelHtml = (order) => {
           <div class="k">Product detail:</div>
           <div class="v">
             <table>
-              <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-              <tbody>${items || '<tr><td colspan="4">No product details</td></tr>'}</tbody>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items || '<tr><td colspan="4">No product details</td></tr>'}
+              </tbody>
             </table>
           </div>
         </div>
         <div class="row r5">
-          <div class="cell"><span>Order No:</span><span contenteditable="true">${escapeHtml(order.orderId) || "N/A"}</span></div>
-          <div class="cell"><span>Shipping Date:</span><span contenteditable="true">${new Date().toLocaleDateString("en-IN")}</span></div>
+          <div class="cell">
+            <span>Order No:</span
+            ><span contenteditable="true"
+              >${escapeHtml(order.orderId) || "N/A"}</span
+            >
+          </div>
+          <div class="cell">
+            <span>Shipping Date:</span
+            ><span contenteditable="true"
+              >${new Date().toLocaleDateString("en-IN")}</span
+            >
+          </div>
         </div>
       </div>
     </main>
   </body>
-</html>`;
+</html>
+`;
 };
