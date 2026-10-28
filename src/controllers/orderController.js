@@ -826,6 +826,7 @@ export const handleRazorpayWebhook = async (req, res) => {
 };
 
 export const expirePendingOnlinePayments = async () => {
+  // 30 minutes after order creation, if payment is still pending and stock is reserved, release the stock and cancel the order
   const expirationTime = new Date(Date.now() - 30 * 60 * 1000);
   const orders = await Order.find({
     paymentMethod: "online",
