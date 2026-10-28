@@ -1166,7 +1166,14 @@ export const markShiprocketShipmentDeleted = async (req, res) => {
         message: "Order not found or a shipment operation is in progress",
       });
     }
-    if (!order.shipment?.shipmentId && !order.shipment?.awb) {
+
+    order.shipment = order.shipment || {};
+    const shipment = order.shipment;
+    const hasShiprocketReference = Boolean(
+      shipment.shiprocketOrderId ?? shipment.shipmentId ?? shipment.awb,
+    );
+
+    if (!hasShiprocketReference) {
       return res.status(409).json({
         success: false,
         message:
@@ -1175,23 +1182,21 @@ export const markShiprocketShipmentDeleted = async (req, res) => {
     }
 
     order.shippingMethod = "shiprocket";
-    order.shipment.shiprocketDeletedOrderId =
-      order.shipment.shiprocketOrderId || null;
-    order.shipment.shiprocketDeletedShipmentId =
-      order.shipment.shipmentId || null;
-    order.shipment.shiprocketDeletedAt = new Date();
-    order.shipment.shiprocketDeletedBy = String(req.admin?.id || "");
-    order.shipment.shiprocketOrderId = null;
-    order.shipment.shipmentId = null;
-    order.shipment.courierId = null;
-    order.shipment.courierName = "";
-    order.shipment.awb = "";
-    order.shipment.trackingNumber = "";
-    order.shipment.trackingUrl = "";
-    order.shipment.submissionState = "not_sent";
-    order.shipment.status = "Shiprocket shipment deletion verified by admin";
-    order.shipment.locked = false;
-    order.shipment.lockedAt = null;
+    shipment.shiprocketDeletedOrderId = shipment.shiprocketOrderId ?? null;
+    shipment.shiprocketDeletedShipmentId = shipment.shipmentId ?? null;
+    shipment.shiprocketDeletedAt = new Date();
+    shipment.shiprocketDeletedBy = String(req.admin?.id || req.admin?._id || "");
+    shipment.shiprocketOrderId = null;
+    shipment.shipmentId = null;
+    shipment.courierId = null;
+    shipment.courierName = "";
+    shipment.awb = "";
+    shipment.trackingNumber = "";
+    shipment.trackingUrl = "";
+    shipment.submissionState = "not_sent";
+    shipment.status = "Shiprocket shipment deletion verified by admin";
+    shipment.locked = false;
+    shipment.lockedAt = null;
     await order.save();
 
     const updated = await Order.findById(order._id)
