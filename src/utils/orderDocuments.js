@@ -657,7 +657,7 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
           <h1 style="text-align: center; width: 100%">
             INDIA SPEEDPOST PARCEL
           </h1>
-          <h2>${codDue ? `COD-RS ${labelMoney(order.total)}` : "PREPAID"}</h2>
+          <h2>${codDue ? `COD - Rs. ${labelMoney(order.total)}` : "PREPAID"}</h2>
           <p>AMOUNT IN WORDS - ${escapeHtml(amountInWords)}</p>
         </div>
         <div class="Customerid">
@@ -676,7 +676,7 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
           <div class="v">
             <div class="name" contenteditable="true">Zyora</div>
             <div class="addr" contenteditable="true">
-              Old No.1A, New No.3, Second Floor, Ragavan Street, Perambur,
+              Old No.1A, New No.3, Second Floor, Ragavan Street, Perambur,<br/>
               Chennai - 600011, Tamil Nadu, India<br />Phone: +91 7010423318
             </div>
           </div>
