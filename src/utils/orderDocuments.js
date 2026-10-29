@@ -82,7 +82,7 @@ export const createOrderInvoiceHtml = (order) => {
         .map(escapeHtml)
         .filter(Boolean)
         .join(" / ");
-      const name = `${escapeHtml(item.name)}${variants ? ` (${variants})` : ""}`;
+      const name = `${escapeHtml(item.name)}`;
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
       return `<tr>
@@ -277,7 +277,7 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
         .map(escapeHtml)
         .filter(Boolean)
         .join(" / ");
-      const name = `${escapeHtml(item.name)}${variants ? ` (${variants})` : ""}`;
+      const name = `${escapeHtml(item.name)}`;
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
       const shippingCents =
