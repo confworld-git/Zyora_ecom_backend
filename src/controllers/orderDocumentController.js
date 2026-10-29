@@ -40,11 +40,31 @@ export const getAdminOrderInvoice = async (req, res) => {
 
 export const getAdminShippingLabel = async (req, res) => {
   try {
+    const { amountInWords, weight } = req.query;
+    if (
+      typeof amountInWords !== "string" ||
+      !amountInWords.trim() ||
+      amountInWords.length > 120 ||
+      typeof weight !== "string" ||
+      !weight.trim() ||
+      weight.length > 40
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount in words and package weight are required",
+      });
+    }
+
     const order = await findOrder(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    return sendHtml(res, order, "address-label", createShippingLabelHtml);
+    return sendHtml(res, order, "address-label", (currentOrder) =>
+      createShippingLabelHtml(currentOrder, {
+        amountInWords: amountInWords.trim(),
+        weight: weight.trim(),
+      }),
+    );
   } catch (error) {
     console.error("Admin shipping label rendering failed:", error);
     return res

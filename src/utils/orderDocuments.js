@@ -250,7 +250,7 @@ export const createOrderInvoiceHtml = (order) => {
 </html>`;
 };
 
-export const createShippingLabelHtml = (order) => {
+export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
   const address = order.shippingAddress || {};
   const recipientAddress = [
     address.houseNumber,
@@ -261,8 +261,18 @@ export const createShippingLabelHtml = (order) => {
     .map(escapeHtml)
     .filter(Boolean)
     .join(", ");
-  const items = (order.items || [])
-    .map((item) => {
+  const orderItems = order.items || [];
+  const itemSubtotals = orderItems.map(
+    (item) => (Number(item.price) || 0) * (Number(item.quantity) || 0),
+  );
+  const totalItemsSubtotal = itemSubtotals.reduce(
+    (total, subtotal) => total + subtotal,
+    0,
+  );
+  const shippingFeeCents = Math.round((Number(order.shippingFee) || 0) * 100);
+  let allocatedShippingCents = 0;
+  const items = orderItems
+    .map((item, index) => {
       const variants = [item.size, item.color]
         .map(escapeHtml)
         .filter(Boolean)
@@ -270,14 +280,27 @@ export const createShippingLabelHtml = (order) => {
       const name = `${escapeHtml(item.name)}${variants ? ` (${variants})` : ""}`;
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
+      const shippingCents =
+        index === orderItems.length - 1
+          ? shippingFeeCents - allocatedShippingCents
+          : totalItemsSubtotal > 0
+            ? Math.round(
+                (shippingFeeCents * itemSubtotals[index]) / totalItemsSubtotal,
+              )
+            : 0;
+      allocatedShippingCents += shippingCents;
+      const shippingCharge = shippingCents / 100;
       return `<tr>
         <td>${name}</td>
         <td>${quantity}</td>
         <td>${labelMoney(price)}</td>
-        <td>${labelMoney(price * quantity)}</td>
+        <td>${labelMoney(shippingCharge)}</td>
+        <td>${labelMoney(price * quantity + shippingCharge)}</td>
       </tr>`;
     })
     .join("");
+  const codDue =
+    order.paymentMethod === "cod" && order.paymentStatus !== "paid";
 
   return `<!doctype html>
 <html lang="en">
@@ -322,11 +345,13 @@ export const createShippingLabelHtml = (order) => {
         width: 100%;
         min-height: 277mm;
         flex-direction: column;
+         border: 1.5px solid var(--ink);
       }
 
       .row {
         display: flex;
         width: 100%;
+        justify-content: center;
         border-bottom: 1.5px solid var(--ink);
       }
 
@@ -349,7 +374,6 @@ export const createShippingLabelHtml = (order) => {
 
       .r1 .date {
         display: flex;
-        flex: 1;
         min-width: 0;
         flex-direction: column;
         justify-content: center;
@@ -363,6 +387,20 @@ export const createShippingLabelHtml = (order) => {
         font-size: 20px;
         font-weight: 400;
         line-height: 1.3;
+      }
+
+      .speedpost {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        padding: 10px 0;
+        border-bottom: 1.5px solid var(--ink);
+      }
+
+      .speedpost > * {
+        margin: 0;
+        padding: 0;
       }
 
       .party {
@@ -437,7 +475,7 @@ export const createShippingLabelHtml = (order) => {
 
       .products th:first-child,
       .products td:first-child {
-        width: 42%;
+        width: 22%;
         text-align: left;
       }
 
@@ -454,6 +492,12 @@ export const createShippingLabelHtml = (order) => {
       .products th:nth-child(4),
       .products td:nth-child(4) {
         width: 24%;
+      }
+
+      .products th:last-child,
+      .products td:last-child {
+        width: 20%;
+        text-align: right;
       }
 
       .products thead {
@@ -476,12 +520,13 @@ export const createShippingLabelHtml = (order) => {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 5mm 3mm;
+        padding: 5mm;
+        box-sizing: border-box;
         border-right: 1.5px solid var(--ink);
         font-size: 18px;
         font-weight: 600;
-        line-height: 1.8;
         text-align: center;
+        line-height: 1.8;
         overflow-wrap: anywhere;
       }
 
@@ -514,6 +559,31 @@ export const createShippingLabelHtml = (order) => {
         margin: 8px auto 0;
         line-height: 1.5;
         color: #444444;
+      }
+
+      .speedpost {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        padding: 20px 0;
+        border-bottom: 1.5px solid var(--ink);
+      }
+
+      .speedpost > p {
+        font-size: 20px;
+        font-weight: 600;
+        margin-top: 5px;
+        text-transform: uppercase;
+      }
+
+      .Customerid {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 4mm;
+        border-bottom: 1.5px solid var(--ink);
       }
 
       @media print {
@@ -583,6 +653,24 @@ export const createShippingLabelHtml = (order) => {
             <p>Destination for E-commerce</p>
           </div>
         </div>
+        <div class="speedpost" style="text-align: center">
+          <h1 style="text-align: center; width: 100%">
+            INDIA SPEEDPOST PARCEL
+          </h1>
+          <h2>${codDue ? `COD-RS ${labelMoney(order.total)}` : "PREPAID"}</h2>
+          <p>AMOUNT IN WORDS - ${escapeHtml(amountInWords)}</p>
+        </div>
+        <div class="Customerid">
+        ${
+          codDue
+            ? `<h3>CUSTOMER ID: 1278831664</h3>
+          |
+          <h3>CONTRACT ID: 41107288</h3>`
+            : `<h3>CUSTOMER ID: 1278831664</h3>
+          |
+          <h3>CONTRACT ID: 41141326</h3>`
+        }
+        </div>
         <div class="row party">
           <div class="k">Sender:</div>
           <div class="v">
@@ -606,26 +694,26 @@ export const createShippingLabelHtml = (order) => {
           </div>
         </div>
         <div class="row party products">
-          <div class="k">Product detail:</div>
           <div class="v">
             <table>
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>Qty</th>
+                  <th>Quantity</th>
                   <th>Price</th>
+                  <th>Shipping Charge</th>
                   <th>Total</th>
                 </tr>
               </thead>
               <tbody>
-                ${items || '<tr><td colspan="4">No product details</td></tr>'}
+                ${items || '<tr><td colspan="5">No product details</td></tr>'}
               </tbody>
             </table>
           </div>
         </div>
         <div class="row r5">
           <div class="cell">
-            <span>Order No:</span
+            <span>Order ID:</span
             ><span contenteditable="true"
               >${escapeHtml(order.orderId) || "N/A"}</span
             >
@@ -635,6 +723,10 @@ export const createShippingLabelHtml = (order) => {
             ><span contenteditable="true"
               >${new Date().toLocaleDateString("en-IN")}</span
             >
+          </div>
+          <div class="cell">
+            <span>Weight:</span
+            ><span contenteditable="true">${escapeHtml(weight)} KG</span>
           </div>
         </div>
       </div>
