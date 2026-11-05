@@ -24,6 +24,7 @@ import couriers from "./routes/couriers.js";
 import { backfillAllProducts } from "./utils/Googlesheets.js";
 import seedAdmin from "./seedAdmin.js";
 import seedProducts from "./seedProducts.js";
+import console from "console";
 
 const app = express();
 
@@ -118,4 +119,36 @@ startServer().catch(async (error) => {
     console.error("MongoDB disconnect failed:", disconnectError.message);
   }
   process.exitCode = 1;
+});
+
+// India post test run
+const BASE = "https://test.cept.gov.in";
+
+app.get("/post", async (req, res) => {
+  try {
+    const apiResponse = await fetch(`https://api.postalpincode.in/postoffice/New Delhi`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username: process.env.INDIA_POST_USERNAME,
+        password: process.env.INDIA_POST_PASSWORD,
+      }),
+    });
+
+    const data = await apiResponse.json();
+    console.log("India Post API Response:", data);
+    return res.status(apiResponse.status).json(data);
+  } catch (error) {
+    console.error("India Post API Error:", error.message);
+    console.error("Error details:", error.cause);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+      cause: error.cause?.message,
+      code: error.cause?.code,
+    });
+  }
 });
