@@ -436,7 +436,15 @@ export const createOrder = async (req, res) => {
 
     if (couponCode) {
       try {
-        const result = await getCouponDiscount(String(couponCode), subtotal);
+        const couponItems = orderItems.map((item) => ({
+          category: productMap.get(item.productId).category,
+          price: item.price,
+          quantity: item.quantity,
+        }));
+        const result = await getCouponDiscount(
+          String(couponCode),
+          couponItems,
+        );
         couponDiscount = Number(result.discountAmount) || 0;
         appliedCode = result.code;
       } catch (couponError) {

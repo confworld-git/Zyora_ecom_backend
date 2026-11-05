@@ -23,6 +23,17 @@ const couponSchema = new mongoose.Schema(
       min: 0,
     },
 
+    applicability: {
+      type: String,
+      enum: ["all", "categories"],
+      default: "all",
+    },
+
+    categories: {
+      type: [String],
+      default: [],
+    },
+
     minimumOrderValue: {
       type: Number,
       required: true,
