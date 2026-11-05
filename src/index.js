@@ -121,34 +121,85 @@ startServer().catch(async (error) => {
   process.exitCode = 1;
 });
 
-// India post test run
-const BASE = "https://test.cept.gov.in";
+
+
+// India Post login test route (UAT/sandbox). Requires Node 18+.
+
+const BASE_URL = "https://test.cept.gov.in/beextcustomer";
 
 app.get("/post", async (req, res) => {
+  const { INDIA_POST_USERNAME, INDIA_POST_PASSWORD } = process.env;
+
+  if (!INDIA_POST_USERNAME || !INDIA_POST_PASSWORD) {
+    return res.status(500).json({
+      success: false,
+      message: "India Post credentials are not configured",
+    });
+  }
+
   try {
-    const apiResponse = await fetch(`https://api.postalpincode.in/postoffice/New Delhi`, {
+    const apiResponse = await fetch(`${BASE_URL}/v1/access/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify({
-        username: process.env.INDIA_POST_USERNAME,
-        password: process.env.INDIA_POST_PASSWORD,
+        username: INDIA_POST_USERNAME,
+        password: INDIA_POST_PASSWORD,
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
-    const data = await apiResponse.json();
-    console.log("India Post API Response:", data);
-    return res.status(apiResponse.status).json(data);
-  } catch (error) {
-    console.error("India Post API Error:", error.message);
-    console.error("Error details:", error.cause);
+    // Read as text first so an HTML error page (502, WAF block) doesn't crash JSON parsing
+    const raw = await apiResponse.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      console.error(`India Post returned non-JSON (HTTP ${apiResponse.status})`);
+      return res.status(502).json({
+        success: false,
+        message: "Unexpected response from India Post",
+        upstreamStatus: apiResponse.status,
+      });
+    }
 
-    return res.status(500).json({
+    console.log("India Post Status:", apiResponse.status);
+    console.log("Login Success:", data.success);
+    console.log("Login Message:", data.message);
+
+    if (!apiResponse.ok || !data.success) {
+      // If India Post replies HTTP 200 with success:false, still return 401
+      const status = apiResponse.ok ? 401 : apiResponse.status;
+      return res.status(status).json({
+        success: false,
+        message: data.message || "India Post login failed",
+      });
+    }
+
+    // Never log or expose tokens. Only confirm they were received.
+    return res.status(200).json({
+      success: true,
+      message: "India Post authentication successful",
+      tokenReceived: !!data.data?.access_token,
+      refreshTokenReceived: !!data.data?.refresh_token,
+      expiresIn: data.data?.expires_in,
+      refreshExpiresIn: data.data?.refresh_expires_in,
+    });
+  } catch (error) {
+    // Keep details in server logs; don't return raw internal error text to the caller
+    console.error("India Post Connection Error:", error.message);
+    console.error("Error Code:", error.cause?.code);
+
+    const timedOut = error.name === "TimeoutError";
+    return res.status(timedOut ? 504 : 502).json({
       success: false,
-      message: error.message,
-      cause: error.cause?.message,
+      message: timedOut
+        ? "India Post request timed out"
+        : "Could not connect to India Post",
       code: error.cause?.code,
     });
   }
 });
+
