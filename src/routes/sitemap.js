@@ -53,6 +53,7 @@ router.get("/", async (req, res) => {
       "/policies?policy=returns",
       "/policies?policy=terms",
       "/policies?policy=privacy",
+      "/frequently-asked-questions",
     ];
 
     const urls = staticPaths.map((path) => ({
