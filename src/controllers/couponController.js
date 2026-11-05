@@ -16,6 +16,7 @@ export const createCoupon = async (req, res) => {
       status,
       applicability = "all",
       categories = [],
+      subcategories = [],
     } = req.body;
 
     if (
@@ -108,7 +109,7 @@ export const createCoupon = async (req, res) => {
       });
     }
 
-    if (!["all", "categories"].includes(applicability)) {
+    if (!["all", "categories", "subcategories"].includes(applicability)) {
       return res.status(400).json({
         success: false,
         message: "Invalid coupon applicability",
@@ -130,11 +131,35 @@ export const createCoupon = async (req, res) => {
           .filter(Boolean),
       ),
     ];
+    if (!Array.isArray(subcategories)) {
+      return res.status(400).json({
+        success: false,
+        message: "Coupon subcategories must be a list",
+      });
+    }
+
+    const couponSubcategories = [
+      ...new Set(
+        subcategories
+          .filter((subcategory) => typeof subcategory === "string")
+          .map((subcategory) => subcategory.trim())
+          .filter(Boolean),
+      ),
+    ];
 
     if (applicability === "categories" && couponCategories.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Select at least one coupon category",
+      });
+    }
+    if (
+      applicability === "subcategories" &&
+      couponSubcategories.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one coupon subcategory",
       });
     }
 
@@ -157,6 +182,8 @@ export const createCoupon = async (req, res) => {
       maximumDiscount: finalMaximumDiscount,
       applicability,
       categories: applicability === "categories" ? couponCategories : [],
+      subcategories:
+        applicability === "subcategories" ? couponSubcategories : [],
       expiryDate: expiry,
       usageLimit: Number(usageLimit),
       usedCount: 0,
@@ -193,7 +220,7 @@ export const getCoupons = async (req, res) => {
       $expr: { $lt: ["$usedCount", "$usageLimit"] },
     })
       .select(
-        "code discountType discountValue minimumOrderValue maximumDiscount expiryDate applicability categories",
+        "code discountType discountValue minimumOrderValue maximumDiscount expiryDate applicability categories subcategories",
       )
       .sort({ createdAt: -1 })
       .lean();
@@ -228,7 +255,7 @@ export const getCouponByCode = async (req, res) => {
       expiryDate: { $gte: new Date() },
       $expr: { $lt: ["$usedCount", "$usageLimit"] },
     }).select(
-      "code discountType discountValue minimumOrderValue maximumDiscount expiryDate applicability categories",
+      "code discountType discountValue minimumOrderValue maximumDiscount expiryDate applicability categories subcategories",
     );
 
     if (!coupon) {
@@ -282,7 +309,7 @@ export const applyCoupon = async (req, res) => {
 
     const productIds = [...new Set(items.map((item) => item.productId.trim()))];
     const products = await Product.find({ id: { $in: productIds } })
-      .select("id category price.selling_price")
+      .select("id category subcategory price.selling_price")
       .lean();
     const productsById = new Map(products.map((product) => [product.id, product]));
 
@@ -298,6 +325,7 @@ export const applyCoupon = async (req, res) => {
       const price = Number(product.price?.selling_price);
       return {
         category: product.category,
+        subcategory: product.subcategory,
         price,
         quantity: Number(item.quantity),
       };
@@ -359,10 +387,11 @@ export const updateCoupon = async (req, res) => {
       usageLimit,
       applicability,
       categories,
+      subcategories,
     } = req.body;
 
     if (applicability !== undefined) {
-      if (!["all", "categories"].includes(applicability)) {
+      if (!["all", "categories", "subcategories"].includes(applicability)) {
         return res
           .status(400)
           .json({ success: false, message: "Invalid coupon applicability" });
@@ -388,6 +417,24 @@ export const updateCoupon = async (req, res) => {
       ];
     }
 
+    if (subcategories !== undefined) {
+      if (!Array.isArray(subcategories)) {
+        return res.status(400).json({
+          success: false,
+          message: "Coupon subcategories must be a list",
+        });
+      }
+
+      coupon.subcategories = [
+        ...new Set(
+          subcategories
+            .filter((subcategory) => typeof subcategory === "string")
+            .map((subcategory) => subcategory.trim())
+            .filter(Boolean),
+        ),
+      ];
+    }
+
     if (coupon.applicability === "categories" && !coupon.categories.length) {
       return res.status(400).json({
         success: false,
@@ -395,7 +442,24 @@ export const updateCoupon = async (req, res) => {
       });
     }
 
-    if (coupon.applicability === "all") coupon.categories = [];
+    if (
+      coupon.applicability === "subcategories" &&
+      !coupon.subcategories.length
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one coupon subcategory",
+      });
+    }
+
+    if (coupon.applicability === "all") {
+      coupon.categories = [];
+      coupon.subcategories = [];
+    } else if (coupon.applicability === "categories") {
+      coupon.subcategories = [];
+    } else {
+      coupon.categories = [];
+    }
 
     if (discountValue !== undefined) {
       if (Number(discountValue) <= 0) {

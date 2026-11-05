@@ -25,11 +25,16 @@ const couponSchema = new mongoose.Schema(
 
     applicability: {
       type: String,
-      enum: ["all", "categories"],
+      enum: ["all", "categories", "subcategories"],
       default: "all",
     },
 
     categories: {
+      type: [String],
+      default: [],
+    },
+
+    subcategories: {
       type: [String],
       default: [],
     },

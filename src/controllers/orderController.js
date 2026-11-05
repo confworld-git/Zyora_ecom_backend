@@ -438,6 +438,7 @@ export const createOrder = async (req, res) => {
       try {
         const couponItems = orderItems.map((item) => ({
           category: productMap.get(item.productId).category,
+          subcategory: productMap.get(item.productId).subcategory,
           price: item.price,
           quantity: item.quantity,
         }));

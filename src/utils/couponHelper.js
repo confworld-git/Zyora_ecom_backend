@@ -36,14 +36,25 @@ export const getCouponDiscount = async (code, items) => {
   }
 
   const isCategoryCoupon = coupon.applicability === "categories";
-  const eligibleCategories = new Set(
-    (coupon.categories || []).map(normalizeCategory).filter(Boolean),
+  const isSubcategoryCoupon = coupon.applicability === "subcategories";
+  const eligibleValues = new Set(
+    (isCategoryCoupon
+      ? coupon.categories || []
+      : coupon.subcategories || []
+    )
+      .map(normalizeCategory)
+      .filter(Boolean),
   );
-  const eligibleItems = isCategoryCoupon
-    ? items.filter((item) =>
-        eligibleCategories.has(normalizeCategory(item.category)),
+  const eligibleItems =
+    isCategoryCoupon || isSubcategoryCoupon
+      ? items.filter((item) =>
+        eligibleValues.has(
+          normalizeCategory(
+            isCategoryCoupon ? item.category : item.subcategory,
+          ),
+        ),
       )
-    : items;
+      : items;
   const total = eligibleItems.reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
     0,
@@ -51,14 +62,14 @@ export const getCouponDiscount = async (code, items) => {
 
   if (total <= 0) {
     throw couponError(
-      isCategoryCoupon
+      isCategoryCoupon || isSubcategoryCoupon
         ? "This coupon is not valid for the items in your cart"
         : "Invalid cart total",
     );
   }
 
   if (total < coupon.minimumOrderValue) {
-    const minimumLabel = isCategoryCoupon
+    const minimumLabel = isCategoryCoupon || isSubcategoryCoupon
       ? "Minimum eligible order value"
       : "Minimum order value";
     throw couponError(`${minimumLabel} is ₹${coupon.minimumOrderValue}`);
@@ -93,6 +104,7 @@ export const getCouponDiscount = async (code, items) => {
       maximumDiscount: coupon.maximumDiscount,
       applicability: coupon.applicability || "all",
       categories: coupon.categories || [],
+      subcategories: coupon.subcategories || [],
     },
   };
 };
