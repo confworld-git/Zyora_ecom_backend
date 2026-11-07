@@ -25,6 +25,7 @@ import { backfillAllProducts } from "./utils/Googlesheets.js";
 import seedAdmin from "./seedAdmin.js";
 import seedProducts from "./seedProducts.js";
 import console from "console";
+import indiaPostRoutes from "./routes/indiaPostRoutes.js";
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api", couriers);
+app.use("/api/india-post", indiaPostRoutes);
 
 const PORT = process.env.PORT || 5001;
 
