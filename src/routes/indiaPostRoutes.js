@@ -29,7 +29,7 @@ router.post("/webhook/events", (req, res) => {
 });
 
 // INDIA POST UAT LOGIN
-router.post("/login", async (req, res) => {
+router.post("/post", async (req, res) => {
   const {
     INDIA_POST_USERNAME,
     INDIA_POST_PASSWORD,
@@ -106,21 +106,39 @@ router.post("/login", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("India Post connection error:", error.message);
-    console.error("Error code:", error.cause?.code);
+  console.error("========== INDIA POST API ERROR ==========");
 
-    const timeout =
-      error.name === "TimeoutError" ||
-      error.name === "AbortError";
+  console.error("Error Name:", error.name);
+  console.error("Error Message:", error.message);
+  console.error("Error Code:", error.code);
+  console.error("Error Cause:", error.cause);
 
-    return res.status(timeout ? 504 : 502).json({
-      success: false,
-      message: timeout
-        ? "India Post request timed out"
-        : "Could not connect to India Post",
-      code: error.cause?.code || error.code || null,
-    });
-  }
+  console.error("Cause Code:", error.cause?.code);
+  console.error("Cause Message:", error.cause?.message);
+  console.error("System Call:", error.cause?.syscall);
+  console.error("Target Address:", error.cause?.address);
+  console.error("Target Port:", error.cause?.port);
+
+  console.error("===========================================");
+
+  const timeout =
+    error.name === "TimeoutError" ||
+    error.name === "AbortError";
+
+  return res.status(timeout ? 504 : 502).json({
+    success: false,
+    message: timeout
+      ? "India Post request timed out"
+      : "Could not connect to India Post",
+    code: error.cause?.code || error.code || null,
+    details: {
+      cause: error.cause?.message || null,
+      syscall: error.cause?.syscall || null,
+      address: error.cause?.address || null,
+      port: error.cause?.port || null,
+    },
+  });
+}
 });
 
 export default router;
