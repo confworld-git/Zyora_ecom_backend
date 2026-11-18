@@ -262,17 +262,8 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
     .filter(Boolean)
     .join(", ");
   const orderItems = order.items || [];
-  const itemSubtotals = orderItems.map(
-    (item) => (Number(item.price) || 0) * (Number(item.quantity) || 0),
-  );
-  const totalItemsSubtotal = itemSubtotals.reduce(
-    (total, subtotal) => total + subtotal,
-    0,
-  );
-  const shippingFeeCents = Math.round((Number(order.shippingFee) || 0) * 100);
-  let allocatedShippingCents = 0;
   const items = orderItems
-    .map((item, index) => {
+    .map((item) => {
       const variants = [item.size, item.color]
         .map(escapeHtml)
         .filter(Boolean)
@@ -280,22 +271,10 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
       const name = `${escapeHtml(item.name)}`;
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
-      const shippingCents =
-        index === orderItems.length - 1
-          ? shippingFeeCents - allocatedShippingCents
-          : totalItemsSubtotal > 0
-            ? Math.round(
-                (shippingFeeCents * itemSubtotals[index]) / totalItemsSubtotal,
-              )
-            : 0;
-      allocatedShippingCents += shippingCents;
-      const shippingCharge = shippingCents / 100;
       return `<tr>
         <td>${name}</td>
         <td>${quantity}</td>
         <td>${labelMoney(price)}</td>
-        <td>${labelMoney(shippingCharge)}</td>
-        <td>${labelMoney(price * quantity + shippingCharge)}</td>
       </tr>`;
     })
     .join("");
@@ -459,45 +438,78 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
         border-collapse: collapse;
         table-layout: fixed;
         font-size: 17px;
+        border: 1.5px solid var(--ink);
       }
 
       .products th,
       .products td {
-        padding: 7px 4px;
+        padding: 8px 6px;
         text-align: right;
         vertical-align: top;
         overflow-wrap: anywhere;
+        border-right: 1px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .products th:last-child,
+      .products td:last-child {
+        border-right: 0;
+      }
+
+      .products tbody tr:last-child td {
+        border-bottom: 0;
       }
 
       .products th {
         font-weight: 700;
+        background: #e9e9e9;
+        text-transform: uppercase;
+      }
+
+      .products tbody td {
+        background: #ffffff;
       }
 
       .products th:first-child,
       .products td:first-child {
-        width: 22%;
+        width: 58%;
         text-align: left;
       }
 
       .products th:nth-child(2),
       .products td:nth-child(2) {
-        width: 12%;
+        width: 17%;
+        text-align: center;
       }
 
       .products th:nth-child(3),
       .products td:nth-child(3) {
-        width: 22%;
-      }
-
-      .products th:nth-child(4),
-      .products td:nth-child(4) {
-        width: 24%;
-      }
-
-      .products th:last-child,
-      .products td:last-child {
-        width: 20%;
+        width: 25%;
         text-align: right;
+      }
+
+      .products .amount-summary {
+        width: 55%;
+        margin-top: 8px;
+        margin-left: auto;
+        table-layout: fixed;
+        border: 0;
+      }
+
+      .products .amount-summary td {
+        width: 50%;
+        padding: 5px 4px;
+        border: 0;
+      }
+
+      .products .amount-summary td:last-child {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .products .amount-summary tr:last-child td {
+        border-top: 1.5px solid var(--ink);
+        font-weight: 700;
       }
 
       .products thead {
@@ -698,15 +710,25 @@ export const createShippingLabelHtml = (order, { amountInWords, weight }) => {
             <table>
               <thead>
                 <tr>
-                  <th>Item</th>
+                  <th>Name</th>
                   <th>Quantity</th>
                   <th>Price</th>
-                  <th>Shipping Charge</th>
-                  <th>Total</th>
                 </tr>
               </thead>
               <tbody>
-                ${items || '<tr><td colspan="5">No product details</td></tr>'}
+                ${items || '<tr><td colspan="3">No product details</td></tr>'}
+              </tbody>
+            </table>
+            <table class="amount-summary">
+              <tbody>
+                <tr>
+                  <td>Shipping</td>
+                  <td>${labelMoney(order.shippingFee)}</td>
+                </tr>
+                <tr>
+                  <td>Total Amount</td>
+                  <td>${labelMoney(order.total)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
